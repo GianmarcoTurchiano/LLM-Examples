@@ -5,7 +5,7 @@ import subprocess
 import shutil
 import time
 
-DEFAULT_HOST = 'localhost:11434'
+DEFAULT_HOST = 'http://localhost:11434'
 HOST_ENV_VAR_NAME = 'OLLAMA_HOST'
 
 WINDOWS_INSTALLER_URL = 'https://ollama.com/download/OllamaSetup.exe'
@@ -16,7 +16,10 @@ PROGRAM_NAME = 'ollama'
 def _is_installed():
     return shutil.which(PROGRAM_NAME) is not None
 
-def _download_and_install_windows(url=WINDOWS_INSTALLER_URL):
+def _download_and_install_windows(url: str = None):
+    if url is None:
+        url = WINDOWS_INSTALLER_URL
+    
     installer_path = 'OllamaSetup.exe'
     try:
         request.urlretrieve(url, installer_path)    
@@ -25,12 +28,15 @@ def _download_and_install_windows(url=WINDOWS_INSTALLER_URL):
         if os.path.exists(installer_path):
             os.remove(installer_path)
 
-def _download_and_install_unix_like(url=UNIX_LIKE_INSTALLER_URL):
+def _download_and_install_unix_like(url: str = None):
+    if url is None:
+        url = UNIX_LIKE_INSTALLER_URL
+    
     with request.urlopen(url) as response:
         script_content = response.read()
     subprocess.run(['sh'], input=script_content, check=True)
 
-def download_and_install(url: str):
+def download_and_install(url: str = None):
     if _is_installed():
         print('Ollama is already installed.')
         return
