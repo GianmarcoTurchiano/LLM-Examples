@@ -1,3 +1,4 @@
+# %% [code]
 import os
 import subprocess
 import time
@@ -9,7 +10,7 @@ import yaml
 import json
 import secrets
 
-_SEARXNG_PORT_ENV_VAR = 'SEARXNG_BIND_ADDRESS'
+_SEARXNG_PORT_ENV_VAR = 'SEARXNG_PORT'
 _SEARXNG_HOST_ENV_VAR = 'SEARXNG_BIND_ADDRESS'
 
 _SEARXNG_DEFAULT_PORT = 8080
@@ -57,7 +58,7 @@ def searxng_start_background_process(host=_SEARXNG_DEFAULT_HOST, port=_SEARXNG_D
         print('SearXNG is already running in the background.')
         return _searxng_process
 
-    _searxng_process = subprocess.Popen(['searxng-run'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _searxng_process = subprocess.Popen(['searxng-run'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
     
     time.sleep(5)
     
