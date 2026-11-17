@@ -1,4 +1,5 @@
 # %% [code]
+# %% [code]
 import os
 import subprocess
 import time
@@ -20,7 +21,10 @@ def _searxng_setup(host=_SEARXNG_DEFAULT_HOST, port=_SEARXNG_DEFAULT_PORT):
     searxng_settings = {
         'use_default_settings': True,
         'server': {
-            'secret_key': secrets.token_hex(32)
+            'bind_address': host,
+            'port': port,
+            'secret_key': secrets.token_hex(32),
+            'debug': False
         },
         'search': {
             'formats': ['html', 'json']
@@ -31,13 +35,12 @@ def _searxng_setup(host=_SEARXNG_DEFAULT_HOST, port=_SEARXNG_DEFAULT_PORT):
     with open(settings_filename, 'w', encoding='utf-8') as f:
         yaml.dump(searxng_settings, f, default_flow_style=False, sort_keys=False)
 
-    env = os.environ.copy()
+    env = os.environ
+    env['SEARXNG_SETTINGS_PATH'] = os.path.abspath(settings_filename)
+    env[_SEARXNG_HOST_ENV_VAR] = host
+    env[_SEARXNG_PORT_ENV_VAR] = str(port)
 
-    os.environ['SEARXNG_SETTINGS_PATH'] = os.path.abspath(settings_filename)
-    os.environ[_SEARXNG_HOST_ENV_VAR] = host
-    os.environ[_SEARXNG_PORT_ENV_VAR] = str(port)
-
-    return env
+    return env.copy()
 
 _searxng_process = None
 
@@ -50,19 +53,21 @@ def _is_searxng_running():
     return _searxng_process.poll() is None
 
 def searxng_start_background_process(host=_SEARXNG_DEFAULT_HOST, port=_SEARXNG_DEFAULT_PORT):
-    env = _searxng_setup(host, port)
-
     global _searxng_process
 
     if _is_searxng_running():
         print('SearXNG is already running in the background.')
         return _searxng_process
 
-    _searxng_process = subprocess.Popen(['searxng-run'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
+    env = _searxng_setup(host, port)
+    
+    _searxng_process = subprocess.Popen(['searxng-run'], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     
     time.sleep(5)
     
     if _searxng_process.poll() is not None:
+        output, _ = _searxng_process.communicate()
+        print("SearXNG Startup Output:\n", output)
         raise RuntimeError(f'SearXNG exited with code {_searxng_process.returncode}.')
 
     print('SearXNG is now running in the background.')
