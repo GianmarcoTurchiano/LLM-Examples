@@ -5,7 +5,6 @@ import secrets
 import urllib
 from typing import Dict
 from bs4 import BeautifulSoup
-import yaml
 import json
 import secrets
 
@@ -14,6 +13,30 @@ _SEARXNG_HOST_ENV_VAR = 'SEARXNG_BIND_ADDRESS'
 
 _SEARXNG_DEFAULT_PORT = 8080
 _SEARXNG_DEFAULT_HOST = 'localhost'
+
+def _dump_simple_yaml(data: dict, indent: int = 4) -> str:
+    lines = []
+    prefix = "  " * indent
+    for key, value in data.items():
+        if isinstance(value, dict):
+            lines.append(f"{prefix}{key}:")
+            lines.append(_dump_simple_yaml(value, indent + 1))
+        elif isinstance(value, list):
+            lines.append(f"{prefix}{key}:")
+            for item in value:
+                lines.append(f"{prefix}  - {_format_yaml_scalar(item)}")
+        else:
+            lines.append(f"{prefix}{key}: {_format_yaml_scalar(value)}")
+    return "\n".join(lines)
+
+
+def _format_yaml_scalar(value) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    text = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{text}"'
 
 def _searxng_setup(host=_SEARXNG_DEFAULT_HOST, port=_SEARXNG_DEFAULT_PORT):
     searxng_settings = {
@@ -31,7 +54,7 @@ def _searxng_setup(host=_SEARXNG_DEFAULT_HOST, port=_SEARXNG_DEFAULT_PORT):
 
     settings_filename = 'searxng_settings.yml'
     with open(settings_filename, 'w', encoding='utf-8') as f:
-        yaml.dump(searxng_settings, f, default_flow_style=False, sort_keys=False)
+        _dump_simple_yaml(searxng_settings)
 
     env = os.environ
     env['SEARXNG_SETTINGS_PATH'] = os.path.abspath(settings_filename)
