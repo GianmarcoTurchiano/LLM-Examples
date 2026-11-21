@@ -9,59 +9,38 @@ import json
 import secrets
 
 _SEARXNG_PORT_ENV_VAR = 'SEARXNG_PORT'
-_SEARXNG_HOST_ENV_VAR = 'SEARXNG_BIND_ADDRESS'
-
+_SEARXNG_BIND_ADDRESS_ENV_VAR = 'SEARXNG_BIND_ADDRESS'
+_SEARXNG_HOST = 'SEARXNG_HOST'
+_SEARXNG_SETTINGS_PATH = 'SEARXNG_SETTINGS_PATH'
 _SEARXNG_DEFAULT_PORT = 8080
-_SEARXNG_DEFAULT_HOST = 'localhost'
+_SEARXNG_DEFAULT_BIND_ADDRESS = 'localhost'
 
-def _dump_simple_yaml(data: dict, indent: int = 4) -> str:
-    lines = []
-    prefix = "  " * indent
-    for key, value in data.items():
-        if isinstance(value, dict):
-            lines.append(f"{prefix}{key}:")
-            lines.append(_dump_simple_yaml(value, indent + 1))
-        elif isinstance(value, list):
-            lines.append(f"{prefix}{key}:")
-            for item in value:
-                lines.append(f"{prefix}  - {_format_yaml_scalar(item)}")
-        else:
-            lines.append(f"{prefix}{key}: {_format_yaml_scalar(value)}")
-    return "\n".join(lines)
+def _searxng_setup(bind_address=_SEARXNG_DEFAULT_BIND_ADDRESS, port=_SEARXNG_DEFAULT_PORT):
+    secret_key = secrets.token_hex(32)
+    yaml_content = (
+        "use_default_settings: true\n"
+        "server:\n"
+        f'  bind_address: "{bind_address}"\n'
+        f"  port: {port}\n"
+        f'  secret_key: "{secret_key}"\n'
+        "  debug: false\n"
+        "search:\n"
+        "  formats:\n"
+        "    - html\n"
+        "    - json\n"
+    )
 
+    settings_filename = "searxng_settings.yml"
+    with open(settings_filename, "w", encoding="utf-8") as f:
+        f.write(yaml_content)
 
-def _format_yaml_scalar(value) -> str:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (int, float)):
-        return str(value)
-    text = str(value).replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{text}"'
-
-def _searxng_setup(host=_SEARXNG_DEFAULT_HOST, port=_SEARXNG_DEFAULT_PORT):
-    searxng_settings = {
-        'use_default_settings': True,
-        'server': {
-            'bind_address': host,
-            'port': port,
-            'secret_key': secrets.token_hex(32),
-            'debug': False
-        },
-        'search': {
-            'formats': ['html', 'json']
-        }
-    }
-
-    settings_filename = 'searxng_settings.yml'
-    with open(settings_filename, 'w', encoding='utf-8') as f:
-        _dump_simple_yaml(searxng_settings)
-
-    env = os.environ
-    env['SEARXNG_SETTINGS_PATH'] = os.path.abspath(settings_filename)
-    env[_SEARXNG_HOST_ENV_VAR] = host
+    env = os.environ.copy()
+    env[_SEARXNG_SETTINGS_PATH] = os.path.abspath(settings_filename)
+    env[_SEARXNG_BIND_ADDRESS_ENV_VAR] = bind_address
     env[_SEARXNG_PORT_ENV_VAR] = str(port)
+    os.environ[_SEARXNG_HOST] = f'http://{bind_address}:{port}'
 
-    return env.copy()
+    return env
 
 _searxng_process = None
 
@@ -73,16 +52,16 @@ def _is_searxng_running():
 
     return _searxng_process.poll() is None
 
-def searxng_start_background_process(host=_SEARXNG_DEFAULT_HOST, port=_SEARXNG_DEFAULT_PORT):
+def searxng_start_background_process(bind_address=_SEARXNG_DEFAULT_BIND_ADDRESS, port=_SEARXNG_DEFAULT_PORT):
     global _searxng_process
 
     if _is_searxng_running():
         print('SearXNG is already running in the background.')
         return _searxng_process
 
-    env = _searxng_setup(host, port)
+    _searxng_setup(bind_address, port)
     
-    _searxng_process = subprocess.Popen(['searxng-run'], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    _searxng_process = subprocess.Popen(['searxng-run'], env=os.environ, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     
     time.sleep(5)
     
@@ -95,10 +74,9 @@ def searxng_start_background_process(host=_SEARXNG_DEFAULT_HOST, port=_SEARXNG_D
     return _searxng_process
 
 def web_search(query: str, lang='it') -> Dict[str, Dict[str, str]]:
-    host = os.environ[_SEARXNG_HOST_ENV_VAR]
-    port = os.environ[_SEARXNG_PORT_ENV_VAR]
+    host = os.environ[_SEARXNG_HOST]
 
-    base_url = f'http://{host}:{port}/search'
+    base_url = f'{host}/search'
 
     params = {
         'q': query,

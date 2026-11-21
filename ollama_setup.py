@@ -71,13 +71,12 @@ def start_background_process(host=DEFAULT_HOST, keep_alive=True):
         print('Ollama is already running in the background.')
         return _ollama_server_process
 
-    env = os.environ.copy()
-    env[HOST_ENV_VAR_NAME] = host
+    os.environ[HOST_ENV_VAR_NAME] = host
 
     if keep_alive:
-        env[KEEP_ALIVE_ENV_VAR_NAME] = '-1'
+        os.environ[KEEP_ALIVE_ENV_VAR_NAME] = '-1'
 
-    _ollama_server_process = subprocess.Popen([PROGRAM_NAME, 'serve'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _ollama_server_process = subprocess.Popen([PROGRAM_NAME, 'serve'], env=os.environ, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     time.sleep(5)
     
