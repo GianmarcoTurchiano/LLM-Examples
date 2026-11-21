@@ -1,5 +1,3 @@
-# %% [code]
-# %% [code]
 import os
 import subprocess
 import time
