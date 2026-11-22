@@ -36,10 +36,9 @@ def searxng_setup(bind_address=_SEARXNG_DEFAULT_BIND_ADDRESS, port=_SEARXNG_DEFA
     with open(settings_filename, "w", encoding="utf-8") as f:
         f.write(yaml_content)
 
-    env = os.environ.copy()
-    env[_SEARXNG_SETTINGS_PATH] = os.path.abspath(settings_filename)
-    env[_SEARXNG_BIND_ADDRESS_ENV_VAR] = bind_address
-    env[_SEARXNG_PORT_ENV_VAR] = str(port)
+    os.environ[_SEARXNG_SETTINGS_PATH] = os.path.abspath(settings_filename)
+    os.environ[_SEARXNG_BIND_ADDRESS_ENV_VAR] = bind_address
+    os.environ[_SEARXNG_PORT_ENV_VAR] = str(port)
     os.environ[_SEARXNG_HOST] = f'http://{bind_address}:{port}'
 
 _searxng_process = None
