@@ -93,12 +93,7 @@ click==8.5.1
     #   pip-tools
     #   uvicorn
 colorama==0.4.6
-    # via
-    #   -r requirements.in
-    #   build
-    #   ipython
-    #   tqdm
-    #   typer
+    # via -r requirements.in
 comm==0.2.3
     # via
     #   -r requirements.in
@@ -389,7 +384,9 @@ parso==0.8.7
     #   -r requirements.in
     #   jedi
 pexpect==4.9.0
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   ipython
 pip-tools==7.7.0
     # via -r requirements.in
 platformdirs==4.12.4
@@ -413,6 +410,7 @@ ptyprocess==0.7.0
     # via
     #   -r requirements.in
     #   pexpect
+    #   terminado
 pure-eval==0.2.4
     # via
     #   -r requirements.in
@@ -469,16 +467,6 @@ pytz==2026.6
     # via
     #   -r requirements.in
     #   flask-babel
-pywin32==312
-    # via
-    #   -r requirements.in
-    #   mcp
-pywinpty==3.1.2
-    # via
-    #   -r requirements.in
-    #   jupyter-server
-    #   jupyter-server-terminals
-    #   terminado
 pyyaml==6.0.4
     # via
     #   -r requirements.in
