@@ -2,11 +2,13 @@ import os
 import subprocess
 import time
 import secrets
-import urllib
 from typing import Dict
-from bs4 import BeautifulSoup
 import json
 import secrets
+
+from requests import RequestException
+import requests
+from bs4 import BeautifulSoup
 
 _SEARXNG_PORT_ENV_VAR = 'SEARXNG_PORT'
 _SEARXNG_BIND_ADDRESS_ENV_VAR = 'SEARXNG_BIND_ADDRESS'
@@ -15,7 +17,7 @@ _SEARXNG_SETTINGS_PATH = 'SEARXNG_SETTINGS_PATH'
 _SEARXNG_DEFAULT_PORT = 8080
 _SEARXNG_DEFAULT_BIND_ADDRESS = 'localhost'
 
-def _searxng_setup(bind_address=_SEARXNG_DEFAULT_BIND_ADDRESS, port=_SEARXNG_DEFAULT_PORT):
+def searxng_setup(bind_address=_SEARXNG_DEFAULT_BIND_ADDRESS, port=_SEARXNG_DEFAULT_PORT):
     secret_key = secrets.token_hex(32)
     yaml_content = (
         "use_default_settings: true\n"
@@ -40,8 +42,6 @@ def _searxng_setup(bind_address=_SEARXNG_DEFAULT_BIND_ADDRESS, port=_SEARXNG_DEF
     env[_SEARXNG_PORT_ENV_VAR] = str(port)
     os.environ[_SEARXNG_HOST] = f'http://{bind_address}:{port}'
 
-    return env
-
 _searxng_process = None
 
 def _is_searxng_running():
@@ -52,14 +52,12 @@ def _is_searxng_running():
 
     return _searxng_process.poll() is None
 
-def searxng_start_background_process(bind_address=_SEARXNG_DEFAULT_BIND_ADDRESS, port=_SEARXNG_DEFAULT_PORT):
+def searxng_start_background_process():
     global _searxng_process
 
     if _is_searxng_running():
         print('SearXNG is already running in the background.')
         return _searxng_process
-
-    _searxng_setup(bind_address, port)
     
     _searxng_process = subprocess.Popen(['searxng-run'], env=os.environ, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     
@@ -73,22 +71,23 @@ def searxng_start_background_process(bind_address=_SEARXNG_DEFAULT_BIND_ADDRESS,
     print('SearXNG is now running in the background.')
     return _searxng_process
 
-def web_search(query: str, lang='it') -> Dict[str, Dict[str, str]]:
-    host = os.environ[_SEARXNG_HOST]
-
-    base_url = f'{host}/search'
-
-    params = {
-        'q': query,
-        'format': 'json',
-        'language': lang
-    }
-    url = f"{base_url}?{urllib.parse.urlencode(params)}"
-
-    with urllib.request.urlopen(url) as response:
-        data = json.loads(response.read().decode('utf-8'))
+def web_search(query: str):
+    host = os.environ['SEARXNG_HOST']
+    response = requests.get(
+        f"{host}/search",
+        params={
+            "q": query,
+            "format": "json",
+            "language": "it"
+        },
+    )
+    
+    response.raise_for_status()
+    
+    data = response.json()
     
     results = {}
+    
     for result in data['results']:
         results[result['url']] = {
             'title': result['title'],
@@ -97,52 +96,40 @@ def web_search(query: str, lang='it') -> Dict[str, Dict[str, str]]:
             
     return results
 
-def web_fetch(url: str) -> Dict[str, int | str]:
+def web_fetch(url: str):
     headers = {
-        'User-Agent': 'MyCoolBot/1.0 (https://example.org/my-tool/; contact@example.org)',
-        'Accept-Encoding': 'gzip'
+        "User-Agent": "MyCoolBot/1.0 (https://example.org/my-tool/; contact@example.org)",
+        "Accept-Encoding": "gzip"
     }
     
     try:
-        req = urllib.request.Request(url, headers=headers)
+        r = requests.get(url, headers=headers, timeout=10)
+        status_code = r.status_code
         
-        with urllib.request.urlopen(req, timeout=10) as response:
-            status_code = response.status
-            html_bytes = response.read()
-            html_text = html_bytes.decode('utf-8', errors='ignore')
-            
-    except urllib.error.HTTPError as e:
-        status_code = e.code
-
         if status_code == 429:
-            retry_after = e.headers.get('Retry-After', 'unknown')
+            retry_after = r.headers.get("Retry-After", "unknown")
             return {
-                'content': f'Error: Rate limited (429). Retry after {retry_after} seconds.',
-                'status_code': status_code
+                "content": f"Error: Rate limited (429). Retry after {retry_after} seconds.",
+                "status_code": status_code
             }
+            
+        r.raise_for_status()
+    except RequestException as e:
+        # Extract status code if a response was received despite the error
+        status_code = e.response.status_code if e.response is not None else None
         return {
-            'content': f'Error fetching {url}: {str(e)}',
-            'status_code': status_code
-        }
-    except urllib.error.URLError as e:
-        return {
-            'content': f'Error fetching {url}: {str(e)}',
-            'status_code': None
-        }
-    except Exception as e:
-        return {
-            'content': f'Error fetching {url}: {str(e)}',
-            'status_code': None
+            "content": f"Error fetching {url}: {str(e)}",
+            "status_code": status_code
         }
     
-    soup = BeautifulSoup(html_text, 'html.parser')
+    soup = BeautifulSoup(r.text, "html.parser")
     
-    for element in soup(['script', 'style', 'noscript']):
+    for element in soup(["script", "style", "noscript"]):
         element.decompose()
     
-    content = soup.get_text(' ', strip=True)
+    content = soup.get_text(" ", strip=True)
     
     return {
-        'content': content,
-        'status_code': status_code
+        "content": content,
+        "status_code": status_code
     }
