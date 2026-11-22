@@ -224,3 +224,4 @@ __marimo__/
 
 requirements.in
 .vscode
+searxng_settings.yml
